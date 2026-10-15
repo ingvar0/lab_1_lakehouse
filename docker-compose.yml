@@ -1,0 +1,120 @@
+name: lakehouse-p1
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    environment:
+      AWS_ACCESS_KEY_ID: lakehouseadmin
+      AWS_SECRET_ACCESS_KEY: lakehousepass123
+      S3_BUCKET: warehouse
+    ports:
+      - "127.0.0.1:8333:8333"
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:9333:9333"
+    volumes:
+      - seaweedfs_data:/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: lakekeeper
+      POSTGRES_PASSWORD: lakekeeper123
+      POSTGRES_DB: lakekeeper
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lakekeeper -d lakekeeper"]
+      interval: 5s
+      retries: 30
+
+  migrate:
+    image: quay.io/lakekeeper/catalog:latest-main
+    command: ["migrate"]
+    environment: &lakekeeper_env
+      LAKEKEEPER__PG_ENCRYPTION_KEY: "This-is-NOT-Secure!"
+      LAKEKEEPER__PG_DATABASE_URL_READ: postgresql://lakekeeper:lakekeeper123@postgres:5432/lakekeeper
+      LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://lakekeeper:lakekeeper123@postgres:5432/lakekeeper
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  lakekeeper:
+    image: quay.io/lakekeeper/catalog:latest-main
+    command: ["serve"]
+    environment: *lakekeeper_env
+    ports:
+      - "127.0.0.1:8181:8181"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/home/nonroot/lakekeeper", "healthcheck"]
+      interval: 5s
+      retries: 30
+
+  bootstrap:
+    image: curlimages/curl:8.12.1
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        curl --fail-with-body -sS -X POST
+        http://lakekeeper:8181/management/v1/bootstrap
+        -H 'Content-Type: application/json'
+        -d '{"accept-terms-of-use":true}'
+    restart: "no"
+
+  trino:
+    image: trinodb/trino:476
+    mem_limit: 2500m
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+      - ./trino/jvm.config:/etc/trino/jvm.config:ro
+    depends_on:
+      warehouse-init:
+        condition: service_completed_successfully
+
+  warehouse-init:
+    image: curlimages/curl:8.12.1
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      seaweedfs:
+        condition: service_started
+    volumes:
+      - ./warehouse.json:/warehouse.json:ro
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        until curl -sS --connect-timeout 2 -o /dev/null
+        http://seaweedfs:8333/ >/dev/null 2>&1;
+        do sleep 2; done;
+        curl --fail-with-body -sS -X POST
+        http://lakekeeper:8181/management/v1/warehouse
+        -H 'Content-Type: application/json'
+        --data-binary @/warehouse.json
+    restart: "no"
+
+  metabase:
+    image: metabase/metabase:latest
+    mem_limit: 1024m
+    environment:
+      JAVA_OPTS: "-Xmx512m"
+      MB_DB_FILE: /metabase-data/metabase.db
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - metabase_data:/metabase-data
+    depends_on:
+      - trino
+
+volumes:
+  seaweedfs_data:
+  postgres_data:
+
+  metabase_data:

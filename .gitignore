@@ -1,0 +1,9 @@
+.DS_Store
+.env
+.env.*
+*.log
+*.bak
+metabase-data/
+postgres-data/
+seaweedfs-data/
+results/*.csv
