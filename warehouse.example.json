@@ -1,0 +1,22 @@
+{
+  "warehouse-name": "demo",
+  "storage-profile": {
+    "type": "s3",
+    "bucket": "warehouse",
+    "region": "us-east-1",
+    "endpoint": "http://seaweedfs:8333",
+    "path-style-access": true,
+    "sts-enabled": false,
+    "flavor": "s3-compat",
+    "key-prefix": "lakehouse"
+  },
+  "storage-credential": {
+    "type": "s3",
+    "credential-type": "access-key",
+    "aws-access-key-id": "YOUR_ACCESS_KEY",
+    "aws-secret-access-key": "YOUR_SECRET_KEY"
+  },
+  "delete-profile": {
+    "type": "hard"
+  }
+}

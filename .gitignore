@@ -7,3 +7,5 @@ metabase-data/
 postgres-data/
 seaweedfs-data/
 results/*.csv
+
+warehouse.json
