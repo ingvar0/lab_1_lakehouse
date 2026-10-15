@@ -3,9 +3,9 @@ services:
   seaweedfs:
     image: chrislusf/seaweedfs:latest
     environment:
-      AWS_ACCESS_KEY_ID: lakehouseadmin
-      AWS_SECRET_ACCESS_KEY: lakehousepass123
-      S3_BUCKET: warehouse
+      AWS_ACCESS_KEY_ID: YOUR_S3_ACCESS_KEY
+      AWS_SECRET_ACCESS_KEY: YOUR_S3_SECRET_KEY
+      POSTGRES_PASSWORD: YOUR_POSTGRES_PASSWORD
     ports:
       - "127.0.0.1:8333:8333"
       - "127.0.0.1:8888:8888"
